@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.lyricsmith">
   <application
       android:label="LyricSmith"
-      android:icon="@mipmap/ic_launcher"
+      android:icon="@android:drawable/sym_def_app_icon"
       android:theme="@style/Theme.LyricSmith">
     <activity
         android:name=".MainActivity"
