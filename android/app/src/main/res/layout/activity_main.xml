@@ -1,28 +1,87 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-  xmlns:app="http://schemas.android.com/apk/res-auto"
-  android:layout_width="match_parent"
-  android:layout_height="match_parent">
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
 
-  <TextView
-    android:id="@+id/title"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text="LyricSmith — Android"
-    android:textStyle="bold"
-    android:textSize="20sp"
-    app:layout_constraintTop_toTopOf="parent"
-    app:layout_constraintStart_toStartOf="parent"
-    app:layout_constraintEnd_toEndOf="parent"
-    android:layout_marginTop="32dp"/>
+    <TextView
+        android:id="@+id/projectTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="LyricSmith"
+        android:textStyle="bold"
+        android:textSize="20sp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
-  <TextView
-    android:id="@+id/body"
-    android:layout_width="0dp"
-    android:layout_height="wrap_content"
-    android:text="Placeholder app shell. We’ll add rhyme/syllable features next."
-    app:layout_constraintTop_toBottomOf="@id/title"
-    app:layout_constraintStart_toStartOf="parent"
-    app:layout_constraintEnd_toEndOf="parent"
-    android:layout_margin="24dp"/>
+    <EditText
+        android:id="@+id/editProjectName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Project name"
+        android:inputType="textCapWords"
+        app:layout_constraintTop_toBottomOf="@id/projectTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"/>
+
+    <EditText
+        android:id="@+id/editBody"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:hint="Type lyrics/poem here…"
+        android:gravity="top|start"
+        android:overScrollMode="always"
+        android:inputType="textMultiLine|textCapSentences"
+        android:minLines="8"
+        app:layout_constraintTop_toBottomOf="@id/editProjectName"
+        app:layout_constraintBottom_toTopOf="@id/statsRow"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"/>
+
+    <LinearLayout
+        android:id="@+id/statsRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toTopOf="@id/suggestionsLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp">
+
+        <TextView
+            android:id="@+id/wordCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Words: 0"
+            android:layout_marginEnd="16dp"/>
+
+        <TextView
+            android:id="@+id/syllableCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Syllables (line): 0"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/suggestionsLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Suggestions (rhymes/near-rhymes):"
+        app:layout_constraintBottom_toTopOf="@id/suggestionsBox"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="8dp"/>
+
+    <TextView
+        android:id="@+id/suggestionsBox"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="(start typing to see suggestions)"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 </androidx.constraintlayout.widget.ConstraintLayout>
