@@ -1,4 +1,4 @@
-name: Android — One Click APK
+name: Android One Click APK
 on: { workflow_dispatch: {} }
 jobs:
   build-apk:
