@@ -7,18 +7,10 @@ on:
         description: Debug or Release
         required: false
         default: debug
-  push:
-    tags:
-      - 'v*'
-
-permissions:
-  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      BUILD_TYPE: ${{ github.event.inputs.buildType || 'debug' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,66 +20,43 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: 'gradle'
 
-      # ✅ Install Android SDK and required packages
-      - name: Set up Android SDK
+      - name: Install Android SDK (cmdline-tools)
         uses: android-actions/setup-android@v3
-        with:
-          api-level: 34
-          build-tools: '34.0.0'
 
-      # ✅ Tell Gradle where the SDK is
-      - name: Create local.properties
+      - name: Install SDK components
         run: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-          cat android/local.properties
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          yes | sdkmanager --licenses
+
+      - name: Configure AndroidX flags
+        run: |
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
 
       - name: Make Gradle wrapper executable
         run: chmod +x android/gradlew
 
-      # Build with useful logs
-      - name: Build APK
+      - name: Build Debug APK
+        if: ${{ github.event.inputs.buildType == 'debug' || github.event.inputs.buildType == '' }}
         working-directory: android
-        run: |
-          if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
-            ./gradlew --no-daemon --stacktrace --info assembleRelease
-          else
-            ./gradlew --no-daemon --stacktrace --info assembleDebug
-          fi
+        run: ./gradlew --no-daemon assembleDebug
 
-      - name: Prepare named APK
-        id: prep
-        run: |
-          RAW="android/app/build/outputs/apk/${{ env.BUILD_TYPE == 'release' && 'release' || 'debug' }}/app-${{ env.BUILD_TYPE == 'release' && 'release' || 'debug' }}.apk"
-          [ -f "$RAW" ] || (echo "APK not found at $RAW" && exit 1)
-          TS=$(date -u +%Y%m%d-%H%M%S)
-          NAME="LyricSmith-${{ env.BUILD_TYPE }}-${TS}.apk"
-          mkdir -p dist
-          cp "$RAW" "dist/$NAME"
-          echo "apk_path=dist/$NAME" >> $GITHUB_OUTPUT
-          echo "apk_name=$NAME" >> $GITHUB_OUTPUT
-
-      - name: Upload artifact (7 days)
+      - name: Upload Debug APK
+        if: ${{ github.event.inputs.buildType == 'debug' || github.event.inputs.buildType == '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.prep.outputs.apk_name }}
-          path: ${{ steps.prep.outputs.apk_path }}
+          name: LyricSmith-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Ensure tag (for dispatch runs)
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        id: ensure_tag
-        run: |
-          TAG="build-${{ github.run_id }}"
-          git tag -f "$TAG" || true
-          git push -f origin "$TAG" || true
-          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+      - name: Build Release APK
+        if: ${{ github.event.inputs.buildType == 'release' }}
+        working-directory: android
+        run: ./gradlew --no-daemon assembleRelease
 
-      - name: Publish Release with APK
-        uses: softprops/action-gh-release@v2
+      - name: Upload Release APK
+        if: ${{ github.event.inputs.buildType == 'release' }}
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && steps.ensure_tag.outputs.tag_name || github.ref_name }}
-          name: LyricSmith ${{ github.event_name == 'workflow_dispatch' && steps.ensure_tag.outputs.tag_name || github.ref_name }}
-          draft: false
-          prerelease: true
-          files: ${{ steps.prep.outputs.apk_path }}
+          name: LyricSmith-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
