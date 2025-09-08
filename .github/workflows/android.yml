@@ -1,25 +1,93 @@
 name: Android One Click APK
+
 on:
   workflow_dispatch:
+    inputs:
+      buildType:
+        description: Debug or Release
+        required: false
+        default: debug
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      BUILD_TYPE: ${{ github.event.inputs.buildType || 'debug' }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Java 17
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+          cache: 'gradle'
+
+      # ✅ Install Android SDK and required packages
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-      - name: Make gradlew executable
+        with:
+          api-level: 34
+          build-tools: '34.0.0'
+
+      # ✅ Tell Gradle where the SDK is
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+          cat android/local.properties
+
+      - name: Make Gradle wrapper executable
         run: chmod +x android/gradlew
-      - name: Build Debug APK (verbose)
+
+      # Build with useful logs
+      - name: Build APK
         working-directory: android
-        run: ./gradlew --no-daemon --stacktrace --info assembleDebug
-      - name: Upload APK
+        run: |
+          if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
+            ./gradlew --no-daemon --stacktrace --info assembleRelease
+          else
+            ./gradlew --no-daemon --stacktrace --info assembleDebug
+          fi
+
+      - name: Prepare named APK
+        id: prep
+        run: |
+          RAW="android/app/build/outputs/apk/${{ env.BUILD_TYPE == 'release' && 'release' || 'debug' }}/app-${{ env.BUILD_TYPE == 'release' && 'release' || 'debug' }}.apk"
+          [ -f "$RAW" ] || (echo "APK not found at $RAW" && exit 1)
+          TS=$(date -u +%Y%m%d-%H%M%S)
+          NAME="LyricSmith-${{ env.BUILD_TYPE }}-${TS}.apk"
+          mkdir -p dist
+          cp "$RAW" "dist/$NAME"
+          echo "apk_path=dist/$NAME" >> $GITHUB_OUTPUT
+          echo "apk_name=$NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact (7 days)
         uses: actions/upload-artifact@v4
         with:
-          name: lyricsmith-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: ${{ steps.prep.outputs.apk_name }}
+          path: ${{ steps.prep.outputs.apk_path }}
+
+      - name: Ensure tag (for dispatch runs)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        id: ensure_tag
+        run: |
+          TAG="build-${{ github.run_id }}"
+          git tag -f "$TAG" || true
+          git push -f origin "$TAG" || true
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Publish Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && steps.ensure_tag.outputs.tag_name || github.ref_name }}
+          name: LyricSmith ${{ github.event_name == 'workflow_dispatch' && steps.ensure_tag.outputs.tag_name || github.ref_name }}
+          draft: false
+          prerelease: true
+          files: ${{ steps.prep.outputs.apk_path }}
