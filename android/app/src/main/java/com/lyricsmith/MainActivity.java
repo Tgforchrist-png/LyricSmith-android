@@ -2,49 +2,52 @@ package com.lyricsmith;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.AssetManager;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.provider.DocumentsContract;
+import android.text.SpannableStringBuilder;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
+import android.text.style.UnderlineSpan;
+import android.text.TextPaint;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.*;
+import java.util.regex.Pattern;
 
-/**
- * v12: Suggestions in header + CMU dictionary-based rhymes.
- */
 public class MainActivity extends AppCompatActivity {
   private EditText editBody, editProjectName;
   private TextView wordCount, syllableCount, suggestionsBox;
+  private Spinner spinnerRhymeType;
   private Uri currentFileUri = null;
 
   private static final int CREATE_FILE = 100;
   private static final int OPEN_FILE = 101;
 
-  // CMU dictionary storage: word -> list of pronunciations (each as String[] phonemes)
-  private final Map<String, List<String[]>> cmu = new HashMap<>();
-  // Rhyme index: rhymeKey -> set of words
-  private final Map<String, Set<String>> rhymeIndex = new HashMap<>();
-  private boolean cmuLoaded = false;
+  enum RhymeMode { EXACT, COMPOUND, CONSONANT_SLOP, ASSONANCE, PHRASES }
+  private RhymeMode currentMode = RhymeMode.EXACT;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -52,15 +55,27 @@ public class MainActivity extends AppCompatActivity {
     setContentView(R.layout.activity_main);
 
     editProjectName = findViewById(R.id.editProjectName);
-    editBody        = findViewById(R.id.editBody);
-    wordCount       = findViewById(R.id.wordCount);
-    syllableCount   = findViewById(R.id.syllableCount);
-    suggestionsBox  = findViewById(R.id.suggestionsBox);
+    editBody = findViewById(R.id.editBody);
+    wordCount = findViewById(R.id.wordCount);
+    syllableCount = findViewById(R.id.syllableCount);
+    suggestionsBox = findViewById(R.id.suggestionsBox);
+    spinnerRhymeType = findViewById(R.id.spinnerRhymeType);
+
+    ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
+            this, R.array.rhyme_modes, android.R.layout.simple_spinner_item);
+    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spinnerRhymeType.setAdapter(adapter);
+    spinnerRhymeType.setSelection(0);
+    spinnerRhymeType.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+      @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+        currentMode = RhymeMode.values()[position];
+        updateStatsAndSuggestions(editBody.getText().toString());
+      }
+      @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+    });
 
     SharedPreferences prefs = getSharedPreferences("LyricSmith", MODE_PRIVATE);
     editProjectName.setText(prefs.getString("projectName", ""));
-
-    loadCmuDictionary();
 
     editBody.addTextChangedListener(new android.text.TextWatcher() {
       @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -69,6 +84,8 @@ public class MainActivity extends AppCompatActivity {
         updateStatsAndSuggestions(s.toString());
       }
     });
+
+    suggestionsBox.setMovementMethod(LinkMovementMethod.getInstance());
   }
 
   @Override
@@ -78,31 +95,23 @@ public class MainActivity extends AppCompatActivity {
     prefs.edit().putString("projectName", editProjectName.getText().toString()).apply();
   }
 
-  // --- Menu ---
+  // Menu
   @Override
   public boolean onCreateOptionsMenu(Menu menu) {
     MenuInflater inflater = getMenuInflater();
     inflater.inflate(R.menu.menu_main, menu);
     return true;
   }
-
   @Override
   public boolean onOptionsItemSelected(MenuItem item) {
     int id = item.getItemId();
-    if (id == R.id.action_save) {
-      saveFile(currentFileUri, false);
-      return true;
-    } else if (id == R.id.action_save_as) {
-      createFile();
-      return true;
-    } else if (id == R.id.action_open) {
-      openFile();
-      return true;
-    }
+    if (id == R.id.action_save)    { saveFile(currentFileUri, false); return true; }
+    if (id == R.id.action_save_as) { createFile(); return true; }
+    if (id == R.id.action_open)    { openFile(); return true; }
     return super.onOptionsItemSelected(item);
   }
 
-  // --- File handling ---
+  // File handling
   private void createFile() {
     Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
     intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -110,27 +119,23 @@ public class MainActivity extends AppCompatActivity {
     intent.putExtra(Intent.EXTRA_TITLE, "lyrics.txt");
     startActivityForResult(intent, CREATE_FILE);
   }
-
   private void openFile() {
     Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
     intent.addCategory(Intent.CATEGORY_OPENABLE);
     intent.setType("text/plain");
     startActivityForResult(intent, OPEN_FILE);
   }
-
   private void saveFile(Uri uri, boolean showToast) {
     if (uri == null) { createFile(); return; }
-    try {
-      OutputStream os = getContentResolver().openOutputStream(uri);
+    try (OutputStream os = getContentResolver().openOutputStream(uri)) {
+      if (os == null) throw new IOException("No stream");
       os.write(editBody.getText().toString().getBytes());
-      os.close();
       if (showToast) Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
     } catch (IOException e) {
       e.printStackTrace();
       Toast.makeText(this, "Save failed", Toast.LENGTH_SHORT).show();
     }
   }
-
   @Override
   protected void onActivityResult(int requestCode, int resultCode, Intent data) {
     super.onActivityResult(requestCode, resultCode, data);
@@ -141,12 +146,10 @@ public class MainActivity extends AppCompatActivity {
       saveFile(uri, true);
     } else if (requestCode == OPEN_FILE) {
       currentFileUri = uri;
-      try {
-        InputStream is = getContentResolver().openInputStream(uri);
-        BufferedReader br = new BufferedReader(new InputStreamReader(is));
+      try (InputStream is = getContentResolver().openInputStream(uri);
+           BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
         StringBuilder sb = new StringBuilder(); String line;
         while ((line = br.readLine()) != null) sb.append(line).append("\n");
-        br.close();
         editBody.setText(sb.toString());
       } catch (IOException e) {
         e.printStackTrace();
@@ -155,59 +158,171 @@ public class MainActivity extends AppCompatActivity {
     }
   }
 
-  // --- Stats + Rhymes ---
+  // Stats + suggestions
   private void updateStatsAndSuggestions(String text) {
     wordCount.setText("Words: " + countWords(text));
     String last = lastNonEmptyLine(text);
     syllableCount.setText("Syllables (line): " + countSyllables(last));
     String target = lastWord(last);
-    if (target.isEmpty()) {
-      suggestionsBox.setText("(start typing…)");
-    } else {
-      List<String> sugg = cmuLoaded ? cmuRhymes(target, 24) : naiveRhymes(target);
-      if (sugg.isEmpty()) {
-        suggestionsBox.setText("(no matches — try another word)");
-      } else {
-        suggestionsBox.setText(joinBullets(sugg));
+
+    List<String> suggestions;
+    switch (currentMode) {
+      case EXACT: suggestions = exactRhymes(target, 20); break;
+      case COMPOUND: suggestions = compoundRhymes(target, 20); break;
+      case CONSONANT_SLOP: suggestions = consonantSlop(target, 20); break;
+      case ASSONANCE: suggestions = assonanceRhymes(target, 20); break;
+      case PHRASES: suggestions = relevantPhrases(target, 20); break;
+      default: suggestions = Collections.emptyList();
+    }
+    renderClickableSuggestions(suggestions, target);
+  }
+
+  private void renderClickableSuggestions(List<String> items, String target) {
+    if (target == null) target = "";
+    if (items == null || items.isEmpty() || target.isEmpty()) {
+      suggestionsBox.setText("No matches — try another word");
+      return;
+    }
+    SpannableStringBuilder sb = new SpannableStringBuilder();
+    for (int i=0;i<items.size();i++) {
+      String token = items.get(i);
+      int start = sb.length();
+      sb.append(token);
+      int end = sb.length();
+
+      final String wordOrPhrase = token;
+      sb.setSpan(new UnderlineSpan(), start, end, 0);
+      sb.setSpan(new ClickableSpan() {
+        @Override public void onClick(View widget) {
+          if (currentMode == RhymeMode.PHRASES) {
+            insertAtCursor(wordOrPhrase);
+          } else {
+            showDictionarySheet(wordOrPhrase);
+          }
+        }
+        @Override public void updateDrawState(TextPaint ds) {
+          super.updateDrawState(ds);
+          ds.setUnderlineText(true);
+        }
+      }, start, end, 0);
+
+      if (i < items.size()-1) sb.append(" · ");
+    }
+    suggestionsBox.setText(sb);
+  }
+
+  private void insertAtCursor(String phrase) {
+    if (phrase == null || phrase.trim().isEmpty()) return;
+    int start = Math.max(editBody.getSelectionStart(), 0);
+    int end = Math.max(editBody.getSelectionEnd(), 0);
+    editBody.getText().replace(Math.min(start, end), Math.max(start, end), phrase);
+  }
+
+  // Dictionary popup (BottomSheet with 3 tabs)
+  private void showDictionarySheet(String word) {
+    BottomSheetDialog sheet = new BottomSheetDialog(this);
+    View view = getLayoutInflater().inflate(R.layout.bottomsheet_dict, null);
+    TextView dictWord = view.findViewById(R.id.dictWord);
+    TabLayout tabs = view.findViewById(R.id.dictTabs);
+    TextView content = view.findViewById(R.id.dictContent);
+
+    dictWord.setText(word);
+    tabs.addTab(tabs.newTab().setText("Definition"));
+    tabs.addTab(tabs.newTab().setText("Synonyms"));
+    tabs.addTab(tabs.newTab().setText("Antonyms"));
+
+    new AsyncTask<Void, Void, Map<String, List<String>>>() {
+      @Override protected Map<String, List<String>> doInBackground(Void... voids) {
+        Map<String, List<String>> out = new HashMap<>();
+        out.put("def", new ArrayList<>());
+        out.put("syn", new ArrayList<>());
+        out.put("ant", new ArrayList<>());
+        try {
+          URL url = new URL("https://api.dictionaryapi.dev/api/v2/entries/en/" + word);
+          HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+          conn.setConnectTimeout(6000);
+          conn.setReadTimeout(6000);
+          try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+            StringBuilder sb = new StringBuilder(); String line;
+            while((line = br.readLine())!=null) sb.append(line);
+            JSONArray arr = new JSONArray(sb.toString());
+            for (int i=0;i<arr.length();i++) {
+              JSONObject entry = arr.getJSONObject(i);
+              JSONArray meanings = entry.optJSONArray("meanings");
+              if (meanings == null) continue;
+              for (int j=0;j<meanings.length();j++) {
+                JSONObject m = meanings.getJSONObject(j);
+                JSONArray defs = m.optJSONArray("definitions");
+                if (defs != null) {
+                  for (int k=0;k<defs.length();k++) {
+                    JSONObject d = defs.getJSONObject(k);
+                    String def = d.optString("definition", "");
+                    if (!def.isEmpty()) out.get("def").add(def);
+                    JSONArray syn = d.optJSONArray("synonyms");
+                    if (syn != null) for (int s=0;s<syn.length();s++) out.get("syn").add(syn.getString(s));
+                    JSONArray ant = d.optJSONArray("antonyms");
+                    if (ant != null) for (int a=0;a<ant.length();a++) out.get("ant").add(ant.getString(a));
+                  }
+                }
+              }
+            }
+          }
+        } catch (Exception ignored) { }
+        return out;
       }
-    }
+      @Override protected void onPostExecute(Map<String, List<String>> data) {
+        tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+          @Override public void onTabSelected(TabLayout.Tab tab) { applyTab(tab.getPosition()); }
+          @Override public void onTabUnselected(TabLayout.Tab tab) {}
+          @Override public void onTabReselected(TabLayout.Tab tab) { applyTab(tab.getPosition()); }
+          private void applyTab(int pos) {
+            List<String> vals = pos==0? data.get("def") : pos==1? data.get("syn") : data.get("ant");
+            if (vals==null || vals.isEmpty()) {
+              content.setText(pos==0? "No definition found." : pos==1? "No synonyms found." : "No antonyms found.");
+            } else {
+              StringBuilder b = new StringBuilder();
+              int count = 0;
+              LinkedHashSet<String> uniq = new LinkedHashSet<>(vals);
+              for (String s: uniq) {
+                b.append("• ").append(s).append("\n");
+                if (++count>=30) break;
+              }
+              content.setText(b.toString().trim());
+            }
+          }
+        });
+        TabLayout.Tab first = tabs.getTabAt(0);
+        if (first!=null) first.select();
+      }
+    }.execute();
+
+    sheet.setContentView(view);
+    sheet.show();
   }
 
-  private static String joinBullets(List<String> items) {
-    StringBuilder sb = new StringBuilder();
-    for (int i=0; i<items.size(); i++) {
-      if (i>0) sb.append(" · ");
-      sb.append(items.get(i));
-    }
-    return sb.toString();
-  }
-
+  // Basic helpers
   private static int countWords(String text) {
     String t = text.trim();
     if (t.isEmpty()) return 0;
     return t.split("\\s+").length;
   }
-
   private static String lastNonEmptyLine(String text) {
     String[] lines = text.split("\\R");
     for (int i = lines.length - 1; i >= 0; i--) if (!lines[i].trim().isEmpty()) return lines[i];
     return "";
   }
-
   private static String lastWord(String line) {
-    String t = line.trim();
+    String t = line == null ? "" : line.trim();
     if (t.isEmpty()) return "";
     String[] parts = t.split("\\s+");
-    return parts[parts.length - 1].replaceAll("^[^\\p{L}]+|[^\\p{L}]+$", "").toLowerCase(Locale.US);
+    return parts[parts.length - 1].replaceAll("^[^\\p{L}]+|[^\\p{L}]+$", "").toLowerCase();
   }
-
   private static int countSyllables(String line) {
     if (line == null || line.trim().isEmpty()) return 0;
     int total = 0;
-    for (String w : line.toLowerCase(Locale.US).split("\\s+")) total += Math.max(syllablesInWord(w),1);
+    for (String w : line.toLowerCase().split("\\s+")) total += Math.max(syllablesInWord(w),1);
     return total;
   }
-
   private static int syllablesInWord(String w) {
     w = w.replaceAll("[^a-z]", "");
     if (w.isEmpty()) return 0;
@@ -216,109 +331,48 @@ public class MainActivity extends AppCompatActivity {
     return Math.max(groups,1);
   }
 
-  // ---- CMU dictionary loading and rhyme logic ----
-  private void loadCmuDictionary() {
-    try {
-      AssetManager am = getAssets();
-      InputStream is = am.open("cmudict.txt"); // placed in assets earlier
-      BufferedReader br = new BufferedReader(new InputStreamReader(is));
-      String line;
-      while ((line = br.readLine()) != null) {
-        if (line.isEmpty() || line.charAt(0) == ';') continue;
-        int sp = line.indexOf("  ");
-        if (sp <= 0) continue;
-        String head = line.substring(0, sp).trim();      // WORD or WORD(1)
-        String phones = line.substring(sp).trim();       // ARPAbet tokens
-        String base = head.replaceAll("\\(\\d+\\)$", "").toLowerCase(Locale.US);
-        String[] toks = phones.split("\\s+");
-        if (toks.length == 0) continue;
-        cmu.computeIfAbsent(base, k -> new ArrayList<>()).add(toks);
-      }
-      br.close();
-
-      for (Map.Entry<String, List<String[]>> e : cmu.entrySet()) {
-        String word = e.getKey();
-        for (String[] ph : e.getValue()) {
-          String key = rhymeKey(ph);
-          if (key == null) continue;
-          rhymeIndex.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(word);
-        }
-      }
-      cmuLoaded = true;
-    } catch (Throwable t) {
-      cmu.clear();
-      rhymeIndex.clear();
-      seedTinyFallback();
-      cmuLoaded = !rhymeIndex.isEmpty();
-    }
+  // Rhyme engines (simple placeholders)
+  private static List<String> exactRhymes(String w, int limit) {
+    if (w==null || w.length()<2) return Collections.emptyList();
+    String[] bank = {"more","core","bore","pour","sore","shore","floor","score","adore","before","restore","outdoor"};
+    return filterByEnding(w, bank, true, limit);
   }
-
-  private static String rhymeKey(String[] phones) {
-    int idx = -1;
-    for (int i = phones.length - 1; i >= 0; i--) {
-      if (phones[i].matches(".*1$")) { idx = i; break; }
-    }
-    if (idx < 0) return null;
-    StringBuilder sb = new StringBuilder();
-    for (int i = idx; i < phones.length; i++) {
-      sb.append(phones[i].replaceAll("\\d","")).append("_");
-    }
-    return sb.toString();
+  private static List<String> compoundRhymes(String w, int limit) {
+    if (w==null || w.length()<2) return Collections.emptyList();
+    String[] bank = {"sliding door","hardcore","either/or","backdoor","encore","sycamore","dinomore"};
+    return filterByEnding(w, bank, true, limit);
   }
-
-  private List<String> cmuRhymes(String w, int limit) {
-    String key = null;
-    List<String[]> prons = cmu.get(w.toLowerCase(Locale.US));
-    if (prons != null) {
-      for (String[] ph : prons) { key = rhymeKey(ph); if (key != null) break; }
-    }
-    if (key == null) return new ArrayList<>();
-
-    Set<String> bucket = rhymeIndex.getOrDefault(key, new LinkedHashSet<>());
+  private static List<String> consonantSlop(String w, int limit) {
+    if (w==null || w.length()<2) return Collections.emptyList();
+    String[] bank = {"tire","dare","tear","fire","fir","for","four","fur"}; // loose on consonants
+    return filterByEnding(w, bank, false, limit);
+  }
+  private static List<String> assonanceRhymes(String w, int limit) {
+    if (w==null || w.isEmpty()) return Collections.emptyList();
+    String vowel = w.replaceAll("(?i)[^aeiou]", "");
+    String[] bank = {"more","flow","tone","home","road","roar","told","torn","toward"};
     List<String> out = new ArrayList<>();
-    for (String cand : bucket) {
-      if (out.size() >= limit) break;
-      if (!cand.equalsIgnoreCase(w)) out.add(cand);
+    for (String cand: bank) {
+      String v = cand.replaceAll("(?i)[^aeiou]", "");
+      if (v.equals(vowel)) out.add(cand);
+      if (out.size()>=limit) break;
     }
     return out;
   }
-
-  private void seedTinyFallback() {
-    addPron("door", new String[]{"D","AO1","R"});
-    addPron("more", new String[]{"M","AO1","R"});
-    addPron("floor", new String[]{"F","L","AO1","R"});
-    addPron("core", new String[]{"K","AO1","R"});
-    addPron("pour", new String[]{"P","AO1","R"});
-    addPron("sore", new String[]{"S","AO1","R"});
-
-    addPron("time", new String[]{"T","AY1","M"});
-    addPron("rhyme", new String[]{"R","AY1","M"});
-    addPron("prime", new String[]{"P","R","AY1","M"});
-    addPron("climb", new String[]{"K","L","AY1","M"});
-    addPron("slime", new String[]{"S","L","AY1","M"});
-
-    addPron("light", new String[]{"L","AY1","T"});
-    addPron("night", new String[]{"N","AY1","T"});
-    addPron("sight", new String[]{"S","AY1","T"});
-    addPron("write", new String[]{"R","AY1","T"});
-
-    for (Map.Entry<String, List<String[]>> e : cmu.entrySet()) {
-      String word = e.getKey();
-      for (String[] ph : e.getValue()) {
-        String key = rhymeKey(ph);
-        if (key == null) continue;
-        rhymeIndex.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(word);
-      }
+  private static List<String> relevantPhrases(String w, int limit) {
+    if (w==null || w.isEmpty()) return Arrays.asList("open the door","behind closed doors","door to door","shut the front door","backdoor deal","keep the score");
+    return Arrays.asList("open the " + w, "behind closed " + w + "s", "at your " + w, "next to the " + w);
+  }
+  private static List<String> filterByEnding(String target, String[] bank, boolean strict, int limit) {
+    List<String> out = new ArrayList<>();
+    String t = target.toLowerCase(Locale.US);
+    for (String s: bank) {
+      String c = s.toLowerCase(Locale.US);
+      boolean ok = c.endsWith(t);
+      if (!strict && !ok) ok = c.matches(".*" + Pattern.quote(t.substring(Math.max(0,t.length()-2))) + ".*");
+      if (ok) out.add(s);
+      if (out.size()>=limit) break;
     }
-  }
-
-  private void addPron(String word, String[] phones) {
-    cmu.computeIfAbsent(word, k -> new ArrayList<>()).add(phones);
-  }
-
-  private static List<String> naiveRhymes(String w) {
-    if (w.length()<2) return Arrays.asList();
-    String tail = w.substring(Math.max(0, w.length()-3));
-    return Arrays.asList(tail+"ore", tail+"orey", tail+"orez", tail+"orex");
+    return out;
   }
 }
