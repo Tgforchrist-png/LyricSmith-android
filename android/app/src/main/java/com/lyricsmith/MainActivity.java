@@ -30,9 +30,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * v12: Suggestions moved to header + CMU dictionary-based rhymes.
- * Rhyme rule: match from the last PRIMARY-STRESS vowel (digit '1') to the end of the phoneme sequence.
- * Falls back to a tiny built-in map if the CMU asset is unavailable.
+ * v12: Suggestions in header + CMU dictionary-based rhymes.
  */
 public class MainActivity extends AppCompatActivity {
   private EditText editBody, editProjectName;
@@ -44,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
 
   // CMU dictionary storage: word -> list of pronunciations (each as String[] phonemes)
   private final Map<String, List<String[]>> cmu = new HashMap<>();
-  // Rhyme index: rhymeKey -> set of words (dedup, preserve order)
+  // Rhyme index: rhymeKey -> set of words
   private final Map<String, Set<String>> rhymeIndex = new HashMap<>();
   private boolean cmuLoaded = false;
 
@@ -59,11 +57,9 @@ public class MainActivity extends AppCompatActivity {
     syllableCount   = findViewById(R.id.syllableCount);
     suggestionsBox  = findViewById(R.id.suggestionsBox);
 
-    // Restore saved project name
     SharedPreferences prefs = getSharedPreferences("LyricSmith", MODE_PRIVATE);
     editProjectName.setText(prefs.getString("projectName", ""));
 
-    // Load CMU dict (best-effort)
     loadCmuDictionary();
 
     editBody.addTextChangedListener(new android.text.TextWatcher() {
@@ -92,12 +88,18 @@ public class MainActivity extends AppCompatActivity {
 
   @Override
   public boolean onOptionsItemSelected(MenuItem item) {
-    switch (item.getItemId()) {
-      case R.id.action_save:    saveFile(currentFileUri, false); return true;
-      case R.id.action_save_as: createFile(); return true;
-      case R.id.action_open:    openFile(); return true;
-      default: return super.onOptionsItemSelected(item);
+    int id = item.getItemId();
+    if (id == R.id.action_save) {
+      saveFile(currentFileUri, false);
+      return true;
+    } else if (id == R.id.action_save_as) {
+      createFile();
+      return true;
+    } else if (id == R.id.action_open) {
+      openFile();
+      return true;
     }
+    return super.onOptionsItemSelected(item);
   }
 
   // --- File handling ---
@@ -222,8 +224,7 @@ public class MainActivity extends AppCompatActivity {
       BufferedReader br = new BufferedReader(new InputStreamReader(is));
       String line;
       while ((line = br.readLine()) != null) {
-        if (line.isEmpty() || line.charAt(0) == ';') continue; // skip comments
-        // Format: WORD  PHONEMES...
+        if (line.isEmpty() || line.charAt(0) == ';') continue;
         int sp = line.indexOf("  ");
         if (sp <= 0) continue;
         String head = line.substring(0, sp).trim();      // WORD or WORD(1)
@@ -235,7 +236,6 @@ public class MainActivity extends AppCompatActivity {
       }
       br.close();
 
-      // Build rhyme index: key(from last primary stress) -> set of words
       for (Map.Entry<String, List<String[]>> e : cmu.entrySet()) {
         String word = e.getKey();
         for (String[] ph : e.getValue()) {
@@ -246,7 +246,6 @@ public class MainActivity extends AppCompatActivity {
       }
       cmuLoaded = true;
     } catch (Throwable t) {
-      // Fallback: tiny internal list; still better than nothing
       cmu.clear();
       rhymeIndex.clear();
       seedTinyFallback();
@@ -255,13 +254,11 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private static String rhymeKey(String[] phones) {
-    // Find last phoneme that has primary stress '1' (e.g., AH1, AO1, EY1)
     int idx = -1;
     for (int i = phones.length - 1; i >= 0; i--) {
       if (phones[i].matches(".*1$")) { idx = i; break; }
     }
     if (idx < 0) return null;
-    // Build key from that index to end, drop stress digits for robustness
     StringBuilder sb = new StringBuilder();
     for (int i = idx; i < phones.length; i++) {
       sb.append(phones[i].replaceAll("\\d","")).append("_");
@@ -273,7 +270,6 @@ public class MainActivity extends AppCompatActivity {
     String key = null;
     List<String[]> prons = cmu.get(w.toLowerCase(Locale.US));
     if (prons != null) {
-      // Prefer first pronunciation that yields a key
       for (String[] ph : prons) { key = rhymeKey(ph); if (key != null) break; }
     }
     if (key == null) return new ArrayList<>();
@@ -288,8 +284,6 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private void seedTinyFallback() {
-    // A few examples to demonstrate correctness without the full asset
-    // door -> more, floor, core, pour, sore
     addPron("door", new String[]{"D","AO1","R"});
     addPron("more", new String[]{"M","AO1","R"});
     addPron("floor", new String[]{"F","L","AO1","R"});
@@ -297,20 +291,17 @@ public class MainActivity extends AppCompatActivity {
     addPron("pour", new String[]{"P","AO1","R"});
     addPron("sore", new String[]{"S","AO1","R"});
 
-    // time -> rhyme, prime, climb, slime
     addPron("time", new String[]{"T","AY1","M"});
     addPron("rhyme", new String[]{"R","AY1","M"});
     addPron("prime", new String[]{"P","R","AY1","M"});
     addPron("climb", new String[]{"K","L","AY1","M"});
     addPron("slime", new String[]{"S","L","AY1","M"});
 
-    // light -> night, sight, write
     addPron("light", new String[]{"L","AY1","T"});
     addPron("night", new String[]{"N","AY1","T"});
     addPron("sight", new String[]{"S","AY1","T"});
     addPron("write", new String[]{"R","AY1","T"});
 
-    // Build index
     for (Map.Entry<String, List<String[]>> e : cmu.entrySet()) {
       String word = e.getKey();
       for (String[] ph : e.getValue()) {
@@ -325,7 +316,6 @@ public class MainActivity extends AppCompatActivity {
     cmu.computeIfAbsent(word, k -> new ArrayList<>()).add(phones);
   }
 
-  // Previous naive fallback (kept in case both CMU + tiny fallback fail)
   private static List<String> naiveRhymes(String w) {
     if (w.length()<2) return Arrays.asList();
     String tail = w.substring(Math.max(0, w.length()-3));
