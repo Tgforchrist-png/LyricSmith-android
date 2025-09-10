@@ -6,6 +6,7 @@
     android:layout_height="match_parent"
     android:padding="16dp">
 
+    <!-- Title -->
     <TextView
         android:id="@+id/projectTitle"
         android:layout_width="0dp"
@@ -17,6 +18,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 
+    <!-- Project name -->
     <EditText
         android:id="@+id/editProjectName"
         android:layout_width="0dp"
@@ -28,6 +30,30 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="8dp"/>
 
+    <!-- Suggestions label (HEADER NOW) -->
+    <TextView
+        android:id="@+id/suggestionsLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Suggestions (rhymes/near-rhymes):"
+        app:layout_constraintTop_toBottomOf="@id/editProjectName"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="8dp"/>
+
+    <!-- Suggestions text (HEADER NOW) -->
+    <TextView
+        android:id="@+id/suggestionsBox"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:scrollbars="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/suggestionsLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="4dp"/>
+
+    <!-- Main editor -->
     <EditText
         android:id="@+id/editBody"
         android:layout_width="0dp"
@@ -37,18 +63,19 @@
         android:overScrollMode="always"
         android:inputType="textMultiLine|textCapSentences"
         android:minLines="8"
-        app:layout_constraintTop_toBottomOf="@id/editProjectName"
+        app:layout_constraintTop_toBottomOf="@id/suggestionsBox"
         app:layout_constraintBottom_toTopOf="@id/statsRow"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="8dp"/>
 
+    <!-- Stats row -->
     <LinearLayout
         android:id="@+id/statsRow"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        app:layout_constraintBottom_toTopOf="@id/suggestionsLabel"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="8dp">
@@ -67,21 +94,4 @@
             android:text="Syllables (line): 0"/>
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/suggestionsLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Suggestions (rhymes/near-rhymes):"
-        app:layout_constraintBottom_toTopOf="@id/suggestionsBox"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="8dp"/>
-
-    <TextView
-        android:id="@+id/suggestionsBox"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="(start typing to see suggestions)"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
 </androidx.constraintlayout.widget.ConstraintLayout>
