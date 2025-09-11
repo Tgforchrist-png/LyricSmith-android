@@ -1,9 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <uses-permission android:name="android.permission.INTERNET"/>
   <application
       android:label="LyricSmith"
-      android:icon="@android:drawable/sym_def_app_icon"
       android:theme="@style/Theme.LyricSmith">
     <activity
         android:name=".MainActivity"
@@ -14,5 +12,4 @@
       </intent-filter>
     </activity>
   </application>
-</manifest>
 </manifest>
