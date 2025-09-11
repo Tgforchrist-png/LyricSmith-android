@@ -1,0 +1,9 @@
+<resources>
+    <string-array name="rhyme_modes">
+        <item>Exact (stress-agnostic)</item>
+        <item>Compound (multi-syllable exact end)</item>
+        <item>Consonant slop</item>
+        <item>Assonance</item>
+        <item>Phrases &amp; idioms</item>
+    </string-array>
+</resources>
