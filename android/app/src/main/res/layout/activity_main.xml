@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:padding="16dp">
 
-    <!-- App title -->
+    <!-- Title -->
     <TextView
         android:id="@+id/projectTitle"
         android:layout_width="0dp"
@@ -16,7 +16,7 @@
         android:textSize="20sp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Project name -->
     <EditText
@@ -28,38 +28,76 @@
         app:layout_constraintTop_toBottomOf="@id/projectTitle"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp"/>
+        android:layout_marginTop="8dp" />
 
-    <!-- Rhyme type selector -->
-    <Spinner
-        android:id="@+id/spinnerRhymeType"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/editProjectName"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="8dp"/>
-
-    <!-- Suggestions (kept at top so keyboard won't cover it) -->
-    <TextView
-        android:id="@+id/suggestionsLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Suggestions:"
-        app:layout_constraintTop_toBottomOf="@id/spinnerRhymeType"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="8dp"/>
-
-    <TextView
-        android:id="@+id/suggestionsBox"
+    <!-- Row: Active box + Generate button -->
+    <LinearLayout
+        android:id="@+id/activeRow"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="(start typing to see suggestions)"
-        app:layout_constraintTop_toBottomOf="@id/suggestionsLabel"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/editProjectName"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="4dp"/>
+        android:layout_marginTop="10dp">
 
-    <!-- Editor -->
+        <EditText
+            android:id="@+id/activeBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Active word(s)…"
+            android:inputType="textCapSentences" />
+
+        <Button
+            android:id="@+id/btnGenerate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚡ Generate"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+    <!-- Active controls row -->
+    <LinearLayout
+        android:id="@+id/activeControls"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/activeRow"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp">
+
+        <Button
+            android:id="@+id/btnClear"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Clear" />
+
+        <Button
+            android:id="@+id/btnRecall"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Recall" />
+
+        <Button
+            android:id="@+id/btnView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="View List" />
+
+        <Button
+            android:id="@+id/btnPaste"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Paste @ cursor" />
+    </LinearLayout>
+
+    <!-- Main editor -->
     <EditText
         android:id="@+id/editBody"
         android:layout_width="0dp"
@@ -69,11 +107,11 @@
         android:overScrollMode="always"
         android:inputType="textMultiLine|textCapSentences"
         android:minLines="8"
-        app:layout_constraintTop_toBottomOf="@id/suggestionsBox"
+        app:layout_constraintTop_toBottomOf="@id/activeControls"
         app:layout_constraintBottom_toTopOf="@id/statsRow"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp"/>
+        android:layout_marginTop="10dp" />
 
     <!-- Stats row -->
     <LinearLayout
@@ -81,7 +119,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/suggestionsLabel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="8dp">
@@ -100,4 +138,22 @@
             android:text="Syllables (line): 0"/>
     </LinearLayout>
 
+    <!-- Suggestions -->
+    <TextView
+        android:id="@+id/suggestionsLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Suggestions:"
+        app:layout_constraintBottom_toTopOf="@id/suggestionsBox"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="8dp"/>
+
+    <TextView
+        android:id="@+id/suggestionsBox"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="(start typing…)"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 </androidx.constraintlayout.widget.ConstraintLayout>
