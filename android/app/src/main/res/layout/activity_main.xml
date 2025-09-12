@@ -4,9 +4,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp">
+    android:padding="12dp">
 
-    <!-- Title -->
+    <!-- Header -->
     <TextView
         android:id="@+id/projectTitle"
         android:layout_width="0dp"
@@ -14,11 +14,10 @@
         android:text="LyricSmith"
         android:textStyle="bold"
         android:textSize="20sp"
-        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
 
-    <!-- Project name -->
     <EditText
         android:id="@+id/editProjectName"
         android:layout_width="0dp"
@@ -28,76 +27,80 @@
         app:layout_constraintTop_toBottomOf="@id/projectTitle"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="6dp"/>
 
-    <!-- Row: Active box + Generate button -->
-    <LinearLayout
-        android:id="@+id/activeRow"
-        android:layout_width="0dp"
+    <!-- Suggestions near header so keyboard won't cover -->
+    <TextView
+        android:id="@+id/suggestionsLabel"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:text="Suggestions (rhymes/near-rhymes):"
         app:layout_constraintTop_toBottomOf="@id/editProjectName"
         app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="8dp"/>
+
+    <TextView
+        android:id="@+id/suggestionsBox"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="(start typing to see suggestions)"
+        app:layout_constraintTop_toBottomOf="@id/suggestionsLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- NEW: Active word(s) entry -->
+    <EditText
+        android:id="@+id/editActive"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Active word(s)"
+        android:inputType="textCapWords"
+        app:layout_constraintTop_toBottomOf="@id/suggestionsBox"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="10dp">
+        android:layout_marginTop="10dp"/>
 
-        <EditText
-            android:id="@+id/activeBox"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="Active word(s)…"
-            android:inputType="textCapSentences" />
-
-        <Button
-            android:id="@+id/btnGenerate"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="⚡ Generate"
-            android:layout_marginStart="8dp" />
-    </LinearLayout>
-
-    <!-- Active controls row -->
+    <!-- NEW: Row of 4 buttons -->
     <LinearLayout
-        android:id="@+id/activeControls"
+        android:id="@+id/activeButtonsRow"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        app:layout_constraintTop_toBottomOf="@id/activeRow"
+        app:layout_constraintTop_toBottomOf="@id/editActive"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp">
+        android:layout_marginTop="6dp">
 
         <Button
             android:id="@+id/btnClear"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Clear" />
+            android:text="Clear"/>
 
         <Button
             android:id="@+id/btnRecall"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Recall" />
+            android:text="Recall"/>
 
         <Button
-            android:id="@+id/btnView"
+            android:id="@+id/btnViewList"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="View List" />
+            android:text="View List"/>
 
         <Button
-            android:id="@+id/btnPaste"
+            android:id="@+id/btnApply"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Paste @ cursor" />
+            android:text="Apply"/>
     </LinearLayout>
 
-    <!-- Main editor -->
+    <!-- Main body -->
     <EditText
         android:id="@+id/editBody"
         android:layout_width="0dp"
@@ -107,28 +110,26 @@
         android:overScrollMode="always"
         android:inputType="textMultiLine|textCapSentences"
         android:minLines="8"
-        app:layout_constraintTop_toBottomOf="@id/activeControls"
+        app:layout_constraintTop_toBottomOf="@id/activeButtonsRow"
         app:layout_constraintBottom_toTopOf="@id/statsRow"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="10dp" />
+        android:layout_marginTop="10dp"/>
 
-    <!-- Stats row -->
+    <!-- Stats -->
     <LinearLayout
         android:id="@+id/statsRow"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        app:layout_constraintBottom_toTopOf="@id/suggestionsLabel"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp">
+        app:layout_constraintEnd_toEndOf="parent">
 
         <TextView
             android:id="@+id/wordCount"
             android:layout_width="wrap_content"
-            and   <TextView
-            anntent"
+            android:layout_height="wrap_content"
             android:text="Words: 0"
             android:layout_marginEnd="16dp"/>
 
@@ -139,22 +140,4 @@
             android:text="Syllables (line): 0"/>
     </LinearLayout>
 
-    <!-- Suggestions -->
-    <TextView
-        android:id="@+id/suggestionsLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Suggestions:"
-        app:layout_constraintBottom_toTopOf="@id/suggestionsBox"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="8dp"/>
-
-    <TextView
-        android:id="@+id/suggestionsBox"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="(start typing…)"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
 </androidx.constraintlayout.widget.ConstraintLayout>
